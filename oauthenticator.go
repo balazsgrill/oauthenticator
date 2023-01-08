@@ -1,6 +1,9 @@
 package oauthenticator
 
-import "golang.org/x/oauth2"
+import (
+	"github.com/knakk/rdf"
+	"golang.org/x/oauth2"
+)
 
 type TokenPersistence interface {
 	oauth2.TokenSource
@@ -17,5 +20,6 @@ type Config interface {
 
 type Provider[C Config] interface {
 	Configs() ([]C, error)
+	Config(item rdf.Term) (C, error)
 	Token(C) TokenPersistence
 }

@@ -32,6 +32,26 @@ WHERE {
   }
 }
 
+# tag: client
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX oauth: <https://oauth.net/2#>
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+SELECT ?clientid ?clientsecret ?redirecturl ?authurl ?tokenurl ?identifier ?label
+WHERE {
+  GRAPH ?anygraph {
+	{{.Client}} rdf:type oauth:Client .
+	{{.Client}} oauth:clientID ?clientid .
+	{{.Client}} oauth:clientSecret ?clientsecret .
+	{{.Client}} oauth:redirectURL ?redirecturl .
+	{{.Client}} oauth:endpoint ?endpoint .
+	{{.Client}} dc:identifier ?identifier .
+	{{.Client}} rdfs:label ?label .
+	?endpoint oauth:authurl ?authurl .
+	?endpoint oauth:tokenurl ?tokenurl .
+  }
+}
+
 # tag: token
 PREFIX oauth: <https://oauth.net/2#>
 SELECT ?token
@@ -80,6 +100,10 @@ type OAuthConfig struct {
 	tokenurl     string
 }
 
+func (c *OAuthConfig) Term() rdf.Term {
+	return c.client
+}
+
 func (c *OAuthConfig) Config() *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     c.clientID,
@@ -117,6 +141,10 @@ func NewSparql(repo *sparql.Repo) oauthenticator.Provider[*OAuthConfig] {
 		repo:    repo,
 		queries: InitializeQueries(),
 	}
+}
+
+func (p *sparqlProvider) Config(term rdf.Term) (*OAuthConfig, error) {
+	return p.queries.GetConfig(p.repo, term)
 }
 
 func (p *sparqlProvider) Configs() ([]*OAuthConfig, error) {
@@ -196,6 +224,38 @@ func (q *Queries) ReadToken(repo *sparql.Repo, client rdf.Term) (*oauth2.Token, 
 		return nil, err
 	}
 	return t, nil
+}
+
+func (q *Queries) GetConfig(repo *sparql.Repo, client rdf.Term) (*OAuthConfig, error) {
+	query, err := q.bank.Prepare("client", struct{ Client string }{
+		Client: client.Serialize(rdf.Turtle),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := repo.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	solutions := res.Solutions()
+
+	for i := 0; i < len(solutions); i++ {
+		solution := solutions[i]
+		return &OAuthConfig{
+			client:       client,
+			clientID:     solution["clientid"].String(),
+			clientSecret: solution["clientsecret"].String(),
+			redirectURL:  solution["redirecturl"].String(),
+			authurl:      solution["authurl"].String(),
+			tokenurl:     solution["tokenurl"].String(),
+			identifier:   solution["identifier"].String(),
+			label:        solution["label"].String(),
+		}, nil
+	}
+
+	return nil, nil
 }
 
 func (q *Queries) ReadConfigs(repo *sparql.Repo) ([]*OAuthConfig, error) {
