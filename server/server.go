@@ -14,12 +14,14 @@ import (
 type Server[C oauthenticator.Config] struct {
 	provider      oauthenticator.Provider[C]
 	authprocesses map[string]C
+	params        func(C) []oauth2.AuthCodeOption
 }
 
 func InitializeServer[C oauthenticator.Config](provider oauthenticator.Provider[C], port int) {
 	server := Server[C]{
 		provider:      provider,
 		authprocesses: make(map[string]C),
+		params:        provider.Options,
 	}
 	// handle route using handler function
 	http.HandleFunc("/verify", server.VerifyRequest)
@@ -73,7 +75,7 @@ func (s *Server[C]) Authenticate(w http.ResponseWriter, r *http.Request) {
 	config := c.Config()
 	state := uuid.NewString()
 	s.authprocesses[state] = c
-	http.Redirect(w, r, config.AuthCodeURL(state, oauth2.SetAuthURLParam("type", "web_server")), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, config.AuthCodeURL(state, s.params(c)...), http.StatusTemporaryRedirect)
 }
 
 func (s *Server[C]) VerifyRequest(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +92,7 @@ func (s *Server[C]) VerifyRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	config := c.Config()
 
-	token, err := config.Exchange(context.Background(), code, oauth2.SetAuthURLParam("type", "web_server"))
+	token, err := config.Exchange(context.Background(), code, s.params(c)...)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Println(err)

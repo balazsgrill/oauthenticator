@@ -22,4 +22,5 @@ type Provider[C Config] interface {
 	Configs() ([]C, error)
 	Config(item rdf.Term) (C, error)
 	Token(C) TokenPersistence
+	Options(C) []oauth2.AuthCodeOption
 }

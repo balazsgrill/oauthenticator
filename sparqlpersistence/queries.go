@@ -73,6 +73,19 @@ INSERT {
 WHERE {
 	OPTIONAL { {{.Client}} oauth:token ?oldtoken }
 }
+
+# tag: options
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX oauth: <https://oauth.net/2#>
+SELECT ?option ?value
+WHERE {
+	GRAPH ?anygraph {
+		{{.Client}} oauth:param ?param .
+		?param rdfs:label ?option .
+		?param rdf:value ?value .
+	}
+}
 `
 
 type Queries struct {
@@ -143,6 +156,14 @@ func NewSparql(repo *sparql.Repo) oauthenticator.Provider[*OAuthConfig] {
 	}
 }
 
+func (p *sparqlProvider) Options(c *OAuthConfig) []oauth2.AuthCodeOption {
+	params, err := p.queries.GetParams(p.repo, c.client)
+	if err != nil {
+		log.Println(err)
+	}
+	return params
+}
+
 func (p *sparqlProvider) Config(term rdf.Term) (*OAuthConfig, error) {
 	return p.queries.GetConfig(p.repo, term)
 }
@@ -167,6 +188,37 @@ func (tp *tokenInRepo) SetToken(t *oauth2.Token) {
 	if err != nil {
 		log.Println(err)
 	}
+}
+
+func (q *Queries) GetParams(repo *sparql.Repo, client rdf.Term) ([]oauth2.AuthCodeOption, error) {
+	query, err := q.bank.Prepare("options", struct {
+		Client string
+	}{
+		Client: client.Serialize(rdf.Turtle),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := repo.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	solutions := result.Solutions()
+	if len(solutions) == 0 {
+		return nil, nil
+	}
+
+	var params []oauth2.AuthCodeOption
+	for i := 0; i < len(solutions); i++ {
+		solution := solutions[i]
+		option := solution["option"].String()
+		value := solution["value"].String()
+		log.Printf("Found option %s\n", option)
+		params = append(params, oauth2.SetAuthURLParam(option, value))
+	}
+
+	return params, nil
 }
 
 func (q *Queries) WriteToken(repo *sparql.Repo, client rdf.Term, t *oauth2.Token) error {
