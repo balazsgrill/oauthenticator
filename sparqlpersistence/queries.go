@@ -214,7 +214,6 @@ func (q *Queries) GetParams(repo *sparql.Repo, client rdf.Term) ([]oauth2.AuthCo
 		solution := solutions[i]
 		option := solution["option"].String()
 		value := solution["value"].String()
-		log.Printf("Found option %s\n", option)
 		params = append(params, oauth2.SetAuthURLParam(option, value))
 	}
 
