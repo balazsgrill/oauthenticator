@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/url"
 	"time"
@@ -14,7 +15,15 @@ import (
 func main() {
 	var repourlstr string
 	flag.StringVar(&repourlstr, "r", "", "URL of SPARQL repository. http://user:pass@host:port/path")
+
+	var port int
+	flag.IntVar(&port, "port", 8083, "Listening port (default 8083)")
+
+	var faviconsrv string
+	flag.StringVar(&faviconsrv, "favicon", "", "Favicon service (currently only faviconkit is supported) e.g. https://something-subdomain.faviconkit.com")
+
 	flag.Parse()
+
 	if repourlstr == "" {
 		log.Fatal("Repository URL is not defined")
 	}
@@ -41,6 +50,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	faviconservice := server.InitFaviconService(faviconsrv)
+	if faviconsrv != "" && faviconservice == nil {
+		fmt.Printf("Favicon service not recognized: '%s'", faviconsrv)
+	}
+
 	provider := sparqlpersistence.NewSparql(repo)
-	server.InitializeServer(provider, 8083)
+	server.InitializeServer(provider, faviconservice, port)
 }

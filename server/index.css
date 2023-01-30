@@ -1,0 +1,10 @@
+li {
+    display:block;
+    text-align: middle;
+    height:40px;
+    padding: 5px;
+    margin: 5px;
+}
+li.error{ background-color:lightcoral; }
+li.valid{ background-color:lightgreen; }
+li.error{ background-color:lightyellow; }

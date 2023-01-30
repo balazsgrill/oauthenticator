@@ -15,13 +15,15 @@ type Server[C oauthenticator.Config] struct {
 	provider      oauthenticator.Provider[C]
 	authprocesses map[string]C
 	params        func(C) []oauth2.AuthCodeOption
+	favicon       FaviconService
 }
 
-func InitializeServer[C oauthenticator.Config](provider oauthenticator.Provider[C], port int) {
+func InitializeServer[C oauthenticator.Config](provider oauthenticator.Provider[C], favicon FaviconService, port int) {
 	server := Server[C]{
 		provider:      provider,
 		authprocesses: make(map[string]C),
 		params:        provider.Options,
+		favicon:       favicon,
 	}
 	// handle route using handler function
 	http.HandleFunc("/verify", server.VerifyRequest)
@@ -31,21 +33,6 @@ func InitializeServer[C oauthenticator.Config](provider oauthenticator.Provider[
 	url := fmt.Sprintf("localhost:%d", port)
 	log.Printf("Listening on %s\n", url)
 	http.ListenAndServe(url, nil)
-}
-
-func (s *Server[C]) Index(w http.ResponseWriter, r *http.Request) {
-	cs, err := s.provider.Configs()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	fmt.Fprint(w, "<html><body>")
-	for _, c := range cs {
-		fmt.Fprintf(w, "<a href=\"/auth?id=%s\">%s</a><br>", c.Identifier(), c.Label())
-	}
-	fmt.Fprint(w, "</body></html>")
 }
 
 func (s *Server[C]) getConfigByID(id string) C {
