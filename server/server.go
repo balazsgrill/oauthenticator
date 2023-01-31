@@ -68,24 +68,30 @@ func (s *Server[C]) Authenticate(w http.ResponseWriter, r *http.Request) {
 func (s *Server[C]) VerifyRequest(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
+
+	msg := "Auth successful"
 	if state == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println("state is not provided")
+		msg = "state is not provided"
 	}
 	c, ok := s.authprocesses[state]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println("invalid state")
+		msg = "invalid state"
 	}
 	config := c.Config()
+
+	// TODO Sparql client leaks HTTP Client settings
+	http.DefaultClient = &http.Client{}
 
 	token, err := config.Exchange(context.Background(), code, s.params(c)...)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Println(err)
+		msg = err.Error()
 	}
 	tokenpersistence := s.provider.Token(c)
 
 	tokenpersistence.SetToken(token)
-	fmt.Fprintf(w, "Auth successful")
+	fmt.Fprint(w, "<a href=\"/\">Return</a><br>")
+	fmt.Fprintf(w, "<pre>%s</pre>", msg)
 }

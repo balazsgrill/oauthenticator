@@ -30,6 +30,8 @@ func (s *Server[C]) Index(w http.ResponseWriter, r *http.Request) {
 			class = "w3-red"
 		} else if token == nil {
 			class = "w3-white"
+		} else if token.AccessToken == "" {
+			class = "w3-red"
 		} else if token.Expiry.IsZero() || time.Now().Before(token.Expiry) {
 			class = "w3-green"
 		} else {
@@ -41,7 +43,7 @@ func (s *Server[C]) Index(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<p>")
 		if s.favicon != nil {
 			imgsrc := s.favicon.FaviconSrc(c.Endpoint().TokenURL)
-			fmt.Fprintf(w, "<img src=\"%s\">", imgsrc)
+			fmt.Fprintf(w, "<img src=\"%s\" style=\"width:3em;height:3em;\">", imgsrc)
 		}
 		fmt.Fprintf(w, "%s</p></li>", c.Label())
 		fmt.Fprintf(w, "</a>")

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/balazsgrill/oauthenticator"
+	"github.com/balazsgrill/oauthenticator/client"
 	"github.com/knakk/rdf"
 	"github.com/knakk/sparql"
 	"golang.org/x/oauth2"
@@ -85,6 +86,21 @@ WHERE {
 		?param rdfs:label ?option .
 		?param rdf:value ?value .
 	}
+}
+
+# tag: clientsOfType
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX oauth: <https://oauth.net/2#>
+PREFIX dc: <http://purl.org/dc/elements/1.1/>
+SELECT ?item ?token
+WHERE {
+  GRAPH ?anygraph {
+	?item rdf:type <{{.ClientType}}> .
+  }
+  GRAPH ?tokengraph {
+	?item oauth:token ?token .
+  }
 }
 `
 
@@ -338,4 +354,34 @@ func (q *Queries) ReadConfigs(repo *sparql.Repo) ([]*OAuthConfig, error) {
 	}
 
 	return result, nil
+}
+
+func (q *Queries) GetClientsOfType(repo *sparql.Repo, clientType string) ([]*client.Oauth2Client, error) {
+	provider := NewSparql(repo)
+	query, err := q.bank.Prepare("clientsOfType", struct{ ClientType string }{ClientType: clientType})
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := repo.Query(query)
+	if err != nil {
+		return nil, err
+	}
+
+	solutions := result.Solutions()
+
+	var res []*client.Oauth2Client
+	for _, solution := range solutions {
+		c, err := provider.Config(solution["item"])
+		token := provider.Token(c)
+		if err != nil {
+			log.Println(err)
+		} else {
+			oclient := client.New(c.Config(), token)
+
+			res = append(res, oclient)
+		}
+	}
+
+	return res, nil
 }
