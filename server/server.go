@@ -18,7 +18,7 @@ type Server[C oauthenticator.Config] struct {
 	favicon       FaviconService
 }
 
-func InitializeServer[C oauthenticator.Config](provider oauthenticator.Provider[C], favicon FaviconService, port int) {
+func InitializeServer[C oauthenticator.Config](serveMux *http.ServeMux, provider oauthenticator.Provider[C], favicon FaviconService) {
 	server := Server[C]{
 		provider:      provider,
 		authprocesses: make(map[string]C),
@@ -26,13 +26,10 @@ func InitializeServer[C oauthenticator.Config](provider oauthenticator.Provider[
 		favicon:       favicon,
 	}
 	// handle route using handler function
-	http.HandleFunc("/verify", server.VerifyRequest)
-	http.HandleFunc("/auth", server.Authenticate)
+	serveMux.HandleFunc("/verify", server.VerifyRequest)
+	serveMux.HandleFunc("/auth", server.Authenticate)
 	//http.HandleFunc("/proxy/", server.ApiReverseProxy)
-	http.HandleFunc("/", server.Index)
-	url := fmt.Sprintf("localhost:%d", port)
-	log.Printf("Listening on %s\n", url)
-	http.ListenAndServe(url, nil)
+	serveMux.HandleFunc("/", server.Index)
 }
 
 func (s *Server[C]) getConfigByID(id string) C {

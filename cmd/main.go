@@ -4,31 +4,40 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/balazsgrill/oauthenticator"
 	"github.com/balazsgrill/oauthenticator/server"
 	"github.com/balazsgrill/oauthenticator/sparqlpersistence"
 	"github.com/knakk/sparql"
 )
 
-func main() {
-	var repourlstr string
-	flag.StringVar(&repourlstr, "r", "", "URL of SPARQL repository. http://user:pass@host:port/path")
+type Main struct {
+	Repourlstr string
+	Port       int
+	Faviconsrv string
 
-	var port int
-	flag.IntVar(&port, "port", 8083, "Listening port (default 8083)")
+	Provider oauthenticator.Provider[*sparqlpersistence.OAuthConfig]
+}
 
-	var faviconsrv string
-	flag.StringVar(&faviconsrv, "favicon", "", "Favicon service (currently only faviconkit is supported) e.g. https://something-subdomain.faviconkit.com")
+func (m *Main) InitFlags() {
+	flag.StringVar(&m.Repourlstr, "r", "", "URL of SPARQL repository. http://user:pass@host:port/path")
+	flag.IntVar(&m.Port, "port", 8083, "Listening port (default 8083)")
+	flag.StringVar(&m.Faviconsrv, "favicon", "", "Favicon service (currently only faviconkit is supported) e.g. https://something-subdomain.faviconkit.com")
+}
 
+func (m *Main) ParseFlags() {
 	flag.Parse()
 
-	if repourlstr == "" {
+	if m.Repourlstr == "" {
 		log.Fatal("Repository URL is not defined")
 	}
+}
 
-	repourl, err := url.Parse(repourlstr)
+func (m *Main) Init() {
+	repourl, err := url.Parse(m.Repourlstr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,11 +59,25 @@ func main() {
 		log.Fatal(err)
 	}
 
-	faviconservice := server.InitFaviconService(faviconsrv)
-	if faviconsrv != "" && faviconservice == nil {
-		fmt.Printf("Favicon service not recognized: '%s'", faviconsrv)
+	faviconservice := server.InitFaviconService(m.Faviconsrv)
+	if m.Faviconsrv != "" && faviconservice == nil {
+		fmt.Printf("Favicon service not recognized: '%s'", m.Faviconsrv)
 	}
 
-	provider := sparqlpersistence.NewSparql(repo)
-	server.InitializeServer(provider, faviconservice, port)
+	m.Provider = sparqlpersistence.NewSparql(repo)
+	server.InitializeServer(http.DefaultServeMux, m.Provider, faviconservice)
+}
+
+func (m *Main) Start() {
+	url := fmt.Sprintf("localhost:%d", m.Port)
+	log.Printf("Listening on %s\n", url)
+	http.ListenAndServe(url, nil)
+}
+
+func main() {
+	main := &Main{}
+	main.InitFlags()
+	main.ParseFlags()
+	main.Init()
+	main.Start()
 }
