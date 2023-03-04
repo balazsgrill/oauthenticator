@@ -23,6 +23,9 @@ func New(oauth *oauth2.Config, tokenPersistence oauthenticator.TokenPersistence)
 
 func (ms *Oauth2Client) GetClient() *http.Client {
 	if ms.client == nil {
+		// reset default client to prevent settings to be overwritten by other previously created http clients
+		http.DefaultClient = &http.Client{}
+
 		ms.client = oauth2.NewClient(context.Background(), ms.TokenPersitence)
 	}
 	return ms.client
