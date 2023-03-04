@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/balazsgrill/oauthenticator"
-	"github.com/balazsgrill/oauthenticator/client"
 	"github.com/knakk/rdf"
 	"github.com/knakk/sparql"
 	"golang.org/x/oauth2"
@@ -188,6 +187,10 @@ func (p *sparqlProvider) Configs() ([]*OAuthConfig, error) {
 	return p.queries.ReadConfigs(p.repo)
 }
 
+func (p *sparqlProvider) ConfigsOfType(ctype string) ([]*OAuthConfig, error) {
+	return p.queries.GetClientsOfType(p.repo, ctype)
+}
+
 func (p *sparqlProvider) Token(c *OAuthConfig) oauthenticator.TokenPersistence {
 	return &tokenInRepo{
 		provider: p,
@@ -308,8 +311,7 @@ func (q *Queries) GetConfig(repo *sparql.Repo, client rdf.Term) (*OAuthConfig, e
 
 	solutions := res.Solutions()
 
-	for i := 0; i < len(solutions); i++ {
-		solution := solutions[i]
+	for _, solution := range solutions {
 		return &OAuthConfig{
 			client:       client,
 			clientID:     solution["clientid"].String(),
@@ -356,7 +358,7 @@ func (q *Queries) ReadConfigs(repo *sparql.Repo) ([]*OAuthConfig, error) {
 	return result, nil
 }
 
-func (q *Queries) GetClientsOfType(repo *sparql.Repo, clientType string) ([]*client.Oauth2Client, error) {
+func (q *Queries) GetClientsOfType(repo *sparql.Repo, clientType string) ([]*OAuthConfig, error) {
 	provider := NewSparql(repo)
 	query, err := q.bank.Prepare("clientsOfType", struct{ ClientType string }{ClientType: clientType})
 	if err != nil {
@@ -370,16 +372,13 @@ func (q *Queries) GetClientsOfType(repo *sparql.Repo, clientType string) ([]*cli
 
 	solutions := result.Solutions()
 
-	var res []*client.Oauth2Client
+	var res []*OAuthConfig
 	for _, solution := range solutions {
 		c, err := provider.Config(solution["item"])
-		token := provider.Token(c)
 		if err != nil {
 			log.Println(err)
 		} else {
-			oclient := client.New(c.Config(), token)
-
-			res = append(res, oclient)
+			res = append(res, c)
 		}
 	}
 

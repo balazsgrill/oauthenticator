@@ -20,6 +20,7 @@ type Config interface {
 
 type Provider[C Config] interface {
 	Configs() ([]C, error)
+	ConfigsOfType(ctype string) ([]C, error)
 	Config(item rdf.Term) (C, error)
 	Token(C) TokenPersistence
 	Options(C) []oauth2.AuthCodeOption
