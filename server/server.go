@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -66,29 +67,41 @@ func (s *Server[C]) VerifyRequest(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 
-	msg := "Auth successful"
+	var err error = nil
+
+	if r.URL.Query().Has("error") {
+		err = fmt.Errorf("%s: %s", r.URL.Query().Get("error"), r.URL.Query().Get("error_description"))
+	}
 	if state == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		msg = "state is not provided"
+		err = errors.New("state is not provided")
 	}
 	c, ok := s.authprocesses[state]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
-		msg = "invalid state"
+		err = errors.New("invalid state")
 	}
 	config := c.Config()
 
 	// TODO Sparql client leaks HTTP Client settings
 	http.DefaultClient = &http.Client{}
 
-	token, err := config.Exchange(context.Background(), code, s.params(c)...)
+	if err == nil {
+		token, err := config.Exchange(context.Background(), code, s.params(c)...)
+		if err == nil {
+			tokenpersistence := s.provider.Token(c)
+			tokenpersistence.SetToken(token)
+		}
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	msg := "Auth successful"
+	if err != nil {
 		msg = err.Error()
 	}
-	tokenpersistence := s.provider.Token(c)
 
-	tokenpersistence.SetToken(token)
 	fmt.Fprint(w, "<a href=\"/\">Return</a><br>")
 	fmt.Fprintf(w, "<pre>%s</pre>", msg)
 }
