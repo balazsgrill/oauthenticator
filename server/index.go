@@ -14,7 +14,7 @@ const header = `
 <body class="w3-container"><ul class="w3-ul w3-card-4 w3-margin" style="max-width:40em">
 `
 
-func (s *Server[C]) Index(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Index(w http.ResponseWriter, r *http.Request) {
 	cs, err := s.provider.Configs()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -25,7 +25,7 @@ func (s *Server[C]) Index(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, header)
 	for _, c := range cs {
 		var class string
-		token, err := s.provider.Token(c).Token()
+		token, err := c.Token().Token()
 		if err != nil {
 			class = "w3-red"
 		} else if token == nil {

@@ -9,21 +9,23 @@ import (
 	"time"
 
 	"github.com/balazsgrill/oauthenticator"
-	"github.com/balazsgrill/oauthenticator/sparqlpersistence"
+	sparqlpersistence "github.com/balazsgrill/oauthenticator/persistence/sparql"
 	"github.com/knakk/sparql"
 )
 
 type MainApp struct {
-	Repourlstr string
-	Port       int
-	Faviconsrv string
-	Repo       *sparql.Repo
+	Repourlstr   string
+	Configdirstr string
+	Port         int
+	Faviconsrv   string
+	Repo         *sparql.Repo
 
-	Provider oauthenticator.Provider[*sparqlpersistence.OAuthConfig]
+	Provider oauthenticator.Provider
 }
 
 func (m *MainApp) InitFlags() {
 	flag.StringVar(&m.Repourlstr, "r", "", "URL of SPARQL repository. http://user:pass@host:port/path")
+	flag.StringVar(&m.Configdirstr, "d", "", "Path of configuration directory. Either this or a sparql repo must be set")
 	flag.IntVar(&m.Port, "port", 8083, "Listening port (default 8083)")
 	flag.StringVar(&m.Faviconsrv, "favicon", "", "Favicon service (currently only faviconkit is supported) e.g. https://something-subdomain.faviconkit.com")
 }
@@ -31,8 +33,11 @@ func (m *MainApp) InitFlags() {
 func (m *MainApp) ParseFlags() {
 	flag.Parse()
 
-	if m.Repourlstr == "" {
-		log.Fatal("Repository URL is not defined")
+	if m.Repourlstr == "" && m.Configdirstr == "" {
+		log.Fatal("Either a SPARQL repository or a configuration directory must be specified!")
+	}
+	if m.Repourlstr != "" && m.Configdirstr != "" {
+		log.Fatal("Both a SPARQL repository and a configuration directory specified. Remove one of them.")
 	}
 }
 

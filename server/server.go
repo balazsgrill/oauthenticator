@@ -9,21 +9,18 @@ import (
 
 	"github.com/balazsgrill/oauthenticator"
 	"github.com/google/uuid"
-	"golang.org/x/oauth2"
 )
 
-type Server[C oauthenticator.Config] struct {
-	provider      oauthenticator.Provider[C]
-	authprocesses map[string]C
-	params        func(C) []oauth2.AuthCodeOption
+type Server struct {
+	provider      oauthenticator.Provider
+	authprocesses map[string]oauthenticator.Config
 	favicon       FaviconService
 }
 
-func InitializeServer[C oauthenticator.Config](serveMux *http.ServeMux, provider oauthenticator.Provider[C], favicon FaviconService) {
-	server := Server[C]{
+func InitializeServer(serveMux *http.ServeMux, provider oauthenticator.Provider, favicon FaviconService) {
+	server := Server{
 		provider:      provider,
-		authprocesses: make(map[string]C),
-		params:        provider.Options,
+		authprocesses: make(map[string]oauthenticator.Config),
 		favicon:       favicon,
 	}
 	// handle route using handler function
@@ -33,23 +30,17 @@ func InitializeServer[C oauthenticator.Config](serveMux *http.ServeMux, provider
 	serveMux.HandleFunc("/", server.Index)
 }
 
-func (s *Server[C]) getConfigByID(id string) C {
-	cs, err := s.provider.Configs()
+func (s *Server) getConfigByID(id string) oauthenticator.Config {
+	cs, err := s.provider.Config(id)
 	if err != nil {
 		log.Print(err)
-		var n C
+		var n oauthenticator.Config
 		return n
 	}
-	for _, c := range cs {
-		if id == c.Identifier() {
-			return c
-		}
-	}
-	var n C
-	return n
+	return cs
 }
 
-func (s *Server[C]) Authenticate(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Authenticate(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	id := query.Get("id")
 	if id == "" {
@@ -60,10 +51,10 @@ func (s *Server[C]) Authenticate(w http.ResponseWriter, r *http.Request) {
 	config := c.Config()
 	state := uuid.NewString()
 	s.authprocesses[state] = c
-	http.Redirect(w, r, config.AuthCodeURL(state, s.params(c)...), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, config.AuthCodeURL(state, c.Options()...), http.StatusTemporaryRedirect)
 }
 
-func (s *Server[C]) VerifyRequest(w http.ResponseWriter, r *http.Request) {
+func (s *Server) VerifyRequest(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 
@@ -87,9 +78,9 @@ func (s *Server[C]) VerifyRequest(w http.ResponseWriter, r *http.Request) {
 	http.DefaultClient = &http.Client{}
 
 	if err == nil {
-		token, err := config.Exchange(context.Background(), code, s.params(c)...)
+		token, err := config.Exchange(context.Background(), code, c.Options()...)
 		if err == nil {
-			tokenpersistence := s.provider.Token(c)
+			tokenpersistence := c.Token()
 			tokenpersistence.SetToken(token)
 		}
 	}

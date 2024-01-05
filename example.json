@@ -1,0 +1,11 @@
+{
+    "label": "example config",
+    "clientid": "client_id",
+    "clientsecret": "top_secret__",
+    "authurl": "https://login.example.com/authorize",
+    "tokenurl": "https://login.example.com/token",
+    "params": {
+        "scope": "profile all",
+        "resource": "https://data.example.com/"
+    }
+}

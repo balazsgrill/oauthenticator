@@ -9,8 +9,7 @@ import (
 
 	"github.com/balazsgrill/oauthenticator"
 	"github.com/balazsgrill/oauthenticator/client"
-	"github.com/balazsgrill/oauthenticator/sparqlpersistence"
-	"github.com/knakk/rdf"
+	sparqlpersistence "github.com/balazsgrill/oauthenticator/persistence/sparql"
 	"github.com/knakk/sparql"
 )
 
@@ -18,10 +17,10 @@ type MainApp struct {
 	Repourlstr string
 	GetUrl     string
 	ConfigIRI  string
-	ConfgTerm  rdf.IRI
+	ConfgTerm  string
 	Repo       *sparql.Repo
 
-	Provider oauthenticator.Provider[*sparqlpersistence.OAuthConfig]
+	Provider oauthenticator.Provider
 }
 
 func (m *MainApp) InitFlags() {
@@ -37,11 +36,7 @@ func (m *MainApp) ParseFlags() {
 		log.Fatal("Repository URL is not defined")
 	}
 
-	var err error
-	m.ConfgTerm, err = rdf.NewIRI(m.ConfigIRI)
-	if err != nil {
-		log.Fatal(err)
-	}
+	m.ConfgTerm = m.ConfigIRI
 }
 
 func (m *MainApp) Init() {
@@ -76,7 +71,7 @@ func (m *MainApp) Start() {
 		log.Fatal(err)
 	}
 
-	client := client.New(c.Config(), m.Provider.Token(c))
+	client := client.New(c.Config(), c.Token())
 	resp, err := client.Get(m.GetUrl)
 	if err != nil {
 		log.Fatal(err)

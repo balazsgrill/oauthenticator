@@ -1,7 +1,6 @@
 package oauthenticator
 
 import (
-	"github.com/knakk/rdf"
 	"golang.org/x/oauth2"
 )
 
@@ -16,12 +15,12 @@ type Config interface {
 	Label() string
 	Config() *oauth2.Config
 	Endpoint() oauth2.Endpoint
+	Token() TokenPersistence
+	Options() []oauth2.AuthCodeOption
 }
 
-type Provider[C Config] interface {
-	Configs() ([]C, error)
-	ConfigsOfType(ctype string) ([]C, error)
-	Config(item rdf.Term) (C, error)
-	Token(C) TokenPersistence
-	Options(C) []oauth2.AuthCodeOption
+type Provider interface {
+	Configs() ([]Config, error)
+	ConfigsOfType(ctype string) ([]Config, error)
+	Config(identifier string) (Config, error)
 }

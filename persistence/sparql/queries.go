@@ -1,4 +1,4 @@
-package sparqlpersistence
+package sparql
 
 import (
 	"bytes"
@@ -118,6 +118,7 @@ type tokenInRepo struct {
 }
 
 type OAuthConfig struct {
+	provider     *sparqlProvider
 	client       rdf.Term
 	identifier   string
 	label        string
@@ -157,6 +158,14 @@ func (c *OAuthConfig) Endpoint() oauth2.Endpoint {
 	}
 }
 
+func (c *OAuthConfig) Token() oauthenticator.TokenPersistence {
+	return c.provider.Token(c)
+}
+
+func (c *OAuthConfig) Options() []oauth2.AuthCodeOption {
+	return c.provider.Options(c)
+}
+
 func InitializeQueries() *Queries {
 	result := &Queries{}
 	data := bytes.NewBufferString(queries)
@@ -164,7 +173,7 @@ func InitializeQueries() *Queries {
 	return result
 }
 
-func NewSparql(repo *sparql.Repo) oauthenticator.Provider[*OAuthConfig] {
+func NewSparql(repo *sparql.Repo) oauthenticator.Provider {
 	return &sparqlProvider{
 		repo:    repo,
 		queries: InitializeQueries(),
@@ -179,15 +188,16 @@ func (p *sparqlProvider) Options(c *OAuthConfig) []oauth2.AuthCodeOption {
 	return params
 }
 
-func (p *sparqlProvider) Config(term rdf.Term) (*OAuthConfig, error) {
-	return p.queries.GetConfig(p.repo, term)
+func (p *sparqlProvider) Config(termid string) (oauthenticator.Config, error) {
+	term, _ := rdf.NewIRI(termid)
+	return p.queries.GetConfig(p, p.repo, term)
 }
 
-func (p *sparqlProvider) Configs() ([]*OAuthConfig, error) {
-	return p.queries.ReadConfigs(p.repo)
+func (p *sparqlProvider) Configs() ([]oauthenticator.Config, error) {
+	return p.queries.ReadConfigs(p, p.repo)
 }
 
-func (p *sparqlProvider) ConfigsOfType(ctype string) ([]*OAuthConfig, error) {
+func (p *sparqlProvider) ConfigsOfType(ctype string) ([]oauthenticator.Config, error) {
 	return p.queries.GetClientsOfType(p.repo, ctype)
 }
 
@@ -296,7 +306,7 @@ func (q *Queries) ReadToken(repo *sparql.Repo, client rdf.Term) (*oauth2.Token, 
 	return t, nil
 }
 
-func (q *Queries) GetConfig(repo *sparql.Repo, client rdf.Term) (*OAuthConfig, error) {
+func (q *Queries) GetConfig(provider *sparqlProvider, repo *sparql.Repo, client rdf.Term) (*OAuthConfig, error) {
 	query, err := q.bank.Prepare("client", struct{ Client string }{
 		Client: client.Serialize(rdf.Turtle),
 	})
@@ -313,6 +323,7 @@ func (q *Queries) GetConfig(repo *sparql.Repo, client rdf.Term) (*OAuthConfig, e
 
 	for _, solution := range solutions {
 		return &OAuthConfig{
+			provider:     provider,
 			client:       client,
 			clientID:     solution["clientid"].String(),
 			clientSecret: solution["clientsecret"].String(),
@@ -327,7 +338,7 @@ func (q *Queries) GetConfig(repo *sparql.Repo, client rdf.Term) (*OAuthConfig, e
 	return nil, nil
 }
 
-func (q *Queries) ReadConfigs(repo *sparql.Repo) ([]*OAuthConfig, error) {
+func (q *Queries) ReadConfigs(provider *sparqlProvider, repo *sparql.Repo) ([]oauthenticator.Config, error) {
 	query, err := q.bank.Prepare("clients")
 	if err != nil {
 		return nil, err
@@ -339,11 +350,12 @@ func (q *Queries) ReadConfigs(repo *sparql.Repo) ([]*OAuthConfig, error) {
 	}
 
 	solutions := res.Solutions()
-	result := make([]*OAuthConfig, len(solutions))
+	result := make([]oauthenticator.Config, len(solutions))
 
 	for i := 0; i < len(solutions); i++ {
 		solution := solutions[i]
 		result[i] = &OAuthConfig{
+			provider:     provider,
 			client:       solution["client"],
 			clientID:     solution["clientid"].String(),
 			clientSecret: solution["clientsecret"].String(),
@@ -358,7 +370,7 @@ func (q *Queries) ReadConfigs(repo *sparql.Repo) ([]*OAuthConfig, error) {
 	return result, nil
 }
 
-func (q *Queries) GetClientsOfType(repo *sparql.Repo, clientType string) ([]*OAuthConfig, error) {
+func (q *Queries) GetClientsOfType(repo *sparql.Repo, clientType string) ([]oauthenticator.Config, error) {
 	provider := NewSparql(repo)
 	query, err := q.bank.Prepare("clientsOfType", struct{ ClientType string }{ClientType: clientType})
 	if err != nil {
@@ -372,9 +384,9 @@ func (q *Queries) GetClientsOfType(repo *sparql.Repo, clientType string) ([]*OAu
 
 	solutions := result.Solutions()
 
-	var res []*OAuthConfig
+	var res []oauthenticator.Config
 	for _, solution := range solutions {
-		c, err := provider.Config(solution["item"])
+		c, err := provider.Config(solution["item"].String())
 		if err != nil {
 			log.Println(err)
 		} else {
