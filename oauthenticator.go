@@ -11,6 +11,7 @@ type TokenPersistence interface {
 }
 
 type Config interface {
+	Type() string
 	Identifier() string
 	Label() string
 	Config() *oauth2.Config

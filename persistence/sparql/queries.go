@@ -166,6 +166,11 @@ func (c *OAuthConfig) Options() []oauth2.AuthCodeOption {
 	return c.provider.Options(c)
 }
 
+func (c *OAuthConfig) Type() string {
+	// TODO
+	return ""
+}
+
 func InitializeQueries() *Queries {
 	result := &Queries{}
 	data := bytes.NewBufferString(queries)

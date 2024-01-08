@@ -11,6 +11,7 @@ import (
 )
 
 type Configdata struct {
+	Type_        string            `json:"type"`
 	Label_       string            `json:"label"`
 	ClientID     string            `json:"clientid"`
 	ClientSecret string            `json:"clientsecret"`
@@ -27,6 +28,10 @@ type config struct {
 
 func (c *config) load() error {
 	return c.Configdata.Load(c.path)
+}
+
+func (c *Configdata) Type() string {
+	return c.Type_
 }
 
 func (c *Configdata) Load(path string) error {
@@ -103,7 +108,17 @@ func (p *directoryProvider) Configs() ([]oauthenticator.Config, error) {
 }
 
 func (p *directoryProvider) ConfigsOfType(ctype string) ([]oauthenticator.Config, error) {
-	return nil, nil
+	var result []oauthenticator.Config
+	configs, err := p.Configs()
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range configs {
+		if c.Type() == ctype {
+			result = append(result, c)
+		}
+	}
+	return result, nil
 }
 
 func (p *directoryProvider) Config(identifier string) (oauthenticator.Config, error) {
