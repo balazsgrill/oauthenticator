@@ -65,6 +65,10 @@ func (m *MainApp) Init() {
 	m.Provider = sparqlpersistence.NewSparql(m.Repo)
 }
 
+func (m *MainApp) Stop() {
+
+}
+
 func (m *MainApp) Start() {
 	c, err := m.Provider.Config(m.ConfgTerm)
 	if err != nil {

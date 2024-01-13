@@ -95,7 +95,7 @@ func (p *directoryProvider) Configs() ([]oauthenticator.Config, error) {
 	}
 	var result []oauthenticator.Config
 	for _, entry := range entries {
-		if strings.HasPrefix(strings.ToLower(entry.Name()), ".json") {
+		if strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
 			c, err := p.Config(p.path + "/" + entry.Name())
 			if err != nil {
 				log.Println(err)

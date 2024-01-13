@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/balazsgrill/oauthenticator"
+	filepersistence "github.com/balazsgrill/oauthenticator/persistence/file"
 	sparqlpersistence "github.com/balazsgrill/oauthenticator/persistence/sparql"
 	"github.com/knakk/sparql"
 )
@@ -21,6 +23,8 @@ type MainApp struct {
 	Repo         *sparql.Repo
 
 	Provider oauthenticator.Provider
+	mux      *http.ServeMux
+	server   *http.Server
 }
 
 func (m *MainApp) InitFlags() {
@@ -41,7 +45,7 @@ func (m *MainApp) ParseFlags() {
 	}
 }
 
-func (m *MainApp) Init() {
+func (m *MainApp) initSparqlRepo() {
 	repourl, err := url.Parse(m.Repourlstr)
 	if err != nil {
 		log.Fatal(err)
@@ -64,17 +68,41 @@ func (m *MainApp) Init() {
 		log.Fatal(err)
 	}
 
+	m.Provider = sparqlpersistence.NewSparql(m.Repo)
+}
+
+func (m *MainApp) initFileRepo() {
+	m.Provider = filepersistence.NewDirectory(m.Configdirstr, fmt.Sprintf("http://localhost:%d/verify", m.Port))
+}
+
+func (m *MainApp) Init() {
+	if m.Repourlstr != "" {
+		m.initSparqlRepo()
+	}
+	if m.Configdirstr != "" {
+		m.initFileRepo()
+	}
+
 	faviconservice := InitFaviconService(m.Faviconsrv)
 	if m.Faviconsrv != "" && faviconservice == nil {
 		fmt.Printf("Favicon service not recognized: '%s'", m.Faviconsrv)
 	}
 
-	m.Provider = sparqlpersistence.NewSparql(m.Repo)
-	InitializeServer(http.DefaultServeMux, m.Provider, faviconservice)
+	m.mux = http.NewServeMux()
+	InitializeServer(m.mux, m.Provider, faviconservice)
+}
+
+func (m *MainApp) HttpServeMux() *http.ServeMux {
+	return m.mux
+}
+
+func (m *MainApp) Stop() {
+	m.server.Shutdown(context.Background())
 }
 
 func (m *MainApp) Start() {
 	url := fmt.Sprintf("localhost:%d", m.Port)
 	log.Printf("Listening on %s\n", url)
-	http.ListenAndServe(url, nil)
+	m.server = &http.Server{Addr: url, Handler: m.HttpServeMux()}
+	m.server.ListenAndServe()
 }
